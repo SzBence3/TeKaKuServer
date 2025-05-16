@@ -1,0 +1,14 @@
+{
+  "name": "tkk-server",
+  "version": "1.0.0",
+  "description": "mindegy",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"hello world\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
