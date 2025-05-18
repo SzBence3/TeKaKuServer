@@ -104,7 +104,7 @@ async function getUser(userid){
 
 function createNewUser(userid, name){
   return new Promise((resolve, reject) => {
-    pool.execute('INSERT INTO users (azonosito, nev) VALUES (?, ?)', [userid, name], (err, results) => {
+    pool.execute('INSERT INTO users (azonosito, name) VALUES (?, ?)', [userid, name], (err, results) => {
       if (err) {
         console.error('Error executing query:', err);
         reject(err);
@@ -195,15 +195,42 @@ async function incrementAnswerVotes(answerId){
   });
 }
 
+async function insertVote(answerId, userId, taskId){
+  return new Promise((resolve, reject) => {
+    pool.execute('INSERT INTO votes (answer_id, user_id, task_id) VALUES (?, ?, ?)', [answerId, userId, taskId], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function incrementUserVotes(userId){
+  return new Promise((resolve, reject) => {
+    pool.execute('UPDATE users SET votes = votes + 1 WHERE id = ?', [userId], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
 async function postSolution(req){
   let taskId = await getTaskId(req.task);
-  let user = await getUser(req.user.userid);
+  let user = await getUser(req.user.azonosito);
   if (user == null) {
-    user = await getUser(await createNewUser(req.user.userid, req.user.name));
+    await createNewUser(req.user.azonosito, req.user.name)
+    user = await getUser(req.user.azonosito);
   }
   // Check if the task dosen't exist in the database
   if (taskId == null) {
-    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question) VALUES (?, ?, ?, ?, ?)', 
+    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question) VALUES (?, ?, ?, ?)', 
       [sha256(req.task.name+";"+req.task.question), req.task.name, req.task.description, req.task.question], 
       (err, results) => {
       if (err) {
@@ -220,6 +247,7 @@ async function postSolution(req){
   if(vote){
     await deleteVote(vote);
   }
+  else await incrementUserVotes(user.id);
   // Check if the answer already exists
   let answer = await getAnswer(taskId, req.task.solution);
   if(!answer){
@@ -235,12 +263,11 @@ async function postSolution(req){
 
 async function main(){
   
-  getSolution(new Task("test", "test", "test", "test")).then((result) => {
-    console.log("Result:", result);
-  }).catch((err) => {
-    console.error("Error:", err);
+  await postSolution({
+    task:new Task("cim", "test", "test", {mo:"megoldas", valasz: "test"}),
+    user:{azonosito: "testid2", name: "test2"}
   });
-  
+  console.log(await getSolution(new Task("cim", "test", "test", "test2")));
   return null;
 }
 main();

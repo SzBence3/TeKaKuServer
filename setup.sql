@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS tasks(
     task_name VARCHAR(50) NOT NULL,
     task_description TEXT,
     task_question TEXT,
-    task_hash VARCHAR(64) NOT NULL UNIQUE
+    task_hash VARCHAR(64) NOT NULL UNIQUE,
+    task_type VARCHAR(50) NOT NULL
 );
 
 CREATE UNIQUE INDEX idx_task_hash ON tasks (task_hash);
@@ -52,6 +53,9 @@ CREATE TABLE IF NOT EXISTS votes(
 CREATE INDEX idx_user_id ON votes (user_id);
 CREATE INDEX idx_task_id ON votes (task_id);
 -- @block
-
-
 SHOW TABLES;
+-- @block
+SELECT * FROM users;
+SELECT * FROM tasks;
+SELECT * FROM answers;
+SELECT * FROM votes;
