@@ -1,5 +1,6 @@
 
 const mysql = require('mysql2');
+const sha256 = require('js-sha256').sha256;
 
 const pool = mysql.createPool(require('./mysql.json'));
 
@@ -16,20 +17,23 @@ class Task {
   }
 }
 
+
+
 // this function handles the incoming get requests
 
 async function getSolution(task){
   
   return new Promise((resolve, reject) => {
-    pool.query('SELECT id FROM tasks WHERE task_hash = ?', sha256(task.name+";"+task.question), (err, results) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question)], (err, results) => {
+      console.log("inside getSolution");
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing query(index.js:29):', err);
         reject(err);
       } else {
         if (results.length > 0) {
-          pool.query('SELECT answer,votes FROM answers WHERE task_id = ? ORDER BY votes DESC', results[0].id, (err, results) => {
+          pool.execute('SELECT answer,votes FROM answers WHERE task_id = ? ORDER BY votes DESC', [results[0].id], (err, results) => {
             if (err) {
-              console.error('Error executing query:', err);
+              console.error('Error executing query(index.js:35):', err);
               reject(err);
             } else {
               if (results.length > 0) {
@@ -55,3 +59,189 @@ async function getSolution(task){
   });
 }
 
+//this function handles the incoming post requests
+class PostRequest {
+  constructor(task, userid, name) {
+    this.task = task;
+    this.userid = userid;
+    this.name = name;
+  }
+}
+
+async function getTaskId(task){
+  return new Promise((resolve, reject) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question)], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        if (results.length > 0) {
+          resolve(results[0].id);
+        } else {
+          resolve(null);
+        }
+      }
+    });
+  });
+}
+
+async function getUser(userid){
+  return new Promise((resolve, reject) => {
+    pool.execute('SELECT id FROM users WHERE azonosito = ?', [userid], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        if (results.length > 0) {
+          resolve(results[0]);
+        } else {
+          resolve(null);
+        }
+      }
+    });
+  });
+}
+
+function createNewUser(userid, name){
+  return new Promise((resolve, reject) => {
+    pool.execute('INSERT INTO users (azonosito, nev) VALUES (?, ?)', [userid, name], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        resolve(results.insertId);
+      }
+    });
+  });
+}
+
+async function getVote(taskId, userId){
+  return new Promise((resolve, reject) => {
+    pool.execute('SELECT * FROM votes WHERE task_id = ? AND user_id = ?', [taskId, userId], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        if (results.length > 0) {
+          resolve(results[0]);
+        } else {
+          resolve(null);
+        }
+      }
+    });
+  });
+}
+
+async function deleteVote(vote){
+  return new Promise((resolve, reject) => {
+    pool.execute('UPDATE answers SET votes = votes - 1 WHERE id = ?', 
+      [vote.answer_id], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        return reject(err);
+      } else {
+        pool.execute("DELETE FROM votes WHERE id = ?",[vote.id], (err, results) => {
+          if (err) {
+            console.error('Error executing query:', err);
+            return reject(err);
+          } else {
+            resolve(results);
+          }
+        });
+      }
+    });
+  });
+}
+
+async function getAnswer(taskId, answer){
+  return new Promise((resolve, reject) => {
+    pool.execute('SELECT * FROM answers WHERE task_id = ? AND answer = ?', [taskId, answer], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        if (results.length > 0) {
+          resolve(results[0]);
+        } else {
+          resolve(null);
+        }
+      }
+    });
+  });
+}
+
+async function insertAnswer(taskId, answer){
+  return new Promise((resolve, reject) => {
+    pool.execute('INSERT INTO answers (task_id, answer, votes) VALUES (?, ?, ?)', [taskId, answer, 0], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+async function incrementAnswerVotes(answerId){
+  return new Promise((resolve, reject) => {
+    pool.execute('UPDATE answers SET votes = votes + 1 WHERE id = ?', [answerId], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function postSolution(req){
+  let taskId = await getTaskId(req.task);
+  let user = await getUser(req.user.userid);
+  if (user == null) {
+    user = await getUser(await createNewUser(req.user.userid, req.user.name));
+  }
+  // Check if the task dosen't exist in the database
+  if (taskId == null) {
+    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question) VALUES (?, ?, ?, ?, ?)', 
+      [sha256(req.task.name+";"+req.task.question), req.task.name, req.task.description, req.task.question], 
+      (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        return null;
+      } else {
+        taskId = results.insertId;
+      }
+    });
+  }
+  taskId = await getTaskId(req.task);
+  // Check if the user has already submitted an answer
+  vote = await getVote(taskId, user.id); 
+  if(vote){
+    await deleteVote(vote);
+  }
+  // Check if the answer already exists
+  let answer = await getAnswer(taskId, req.task.solution);
+  if(!answer){
+    await insertAnswer(taskId, req.task.solution);
+    answer = await getAnswer(taskId, req.task.solution);
+  }
+  
+  await incrementAnswerVotes(answer.id);
+  await insertVote(answer.id, user.id, taskId);
+
+  return null;
+}
+
+async function main(){
+  
+  getSolution(new Task("test", "test", "test", "test")).then((result) => {
+    console.log("Result:", result);
+  }).catch((err) => {
+    console.error("Error:", err);
+  });
+  
+  return null;
+}
+main();
+//console.log(getSolution(new Task("test", "test", "test", "test")));
