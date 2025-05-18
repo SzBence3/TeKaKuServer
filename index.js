@@ -1,6 +1,7 @@
 
 const mysql = require('mysql2');
 const sha256 = require('js-sha256').sha256;
+const express = require('express');
 
 const pool = mysql.createPool(require('./mysql.json'));
 
@@ -9,11 +10,12 @@ pool.on('error', (err) => {
 });
 
 class Task {
-  constructor(name, description, question, solution) {
+  constructor(name, description, question, solution, type) {
     this.name = name;
     this.question = question;
     this.description = description;
     this.solution = solution;
+    this.type = type;
   }
 }
 
@@ -24,8 +26,8 @@ class Task {
 async function getSolution(task){
   
   return new Promise((resolve, reject) => {
-    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question)], (err, results) => {
-      console.log("inside getSolution");
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question+";"+task.type)], (err, results) => {
+      //console.log("inside getSolution");
       if (err) {
         console.error('Error executing query(index.js:29):', err);
         reject(err);
@@ -70,7 +72,7 @@ class PostRequest {
 
 async function getTaskId(task){
   return new Promise((resolve, reject) => {
-    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question)], (err, results) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question+";"+task.type)], (err, results) => {
       if (err) {
         console.error('Error executing query:', err);
         reject(err);
@@ -230,8 +232,8 @@ async function postSolution(req){
   }
   // Check if the task dosen't exist in the database
   if (taskId == null) {
-    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question) VALUES (?, ?, ?, ?)', 
-      [sha256(req.task.name+";"+req.task.question), req.task.name, req.task.description, req.task.question], 
+    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question, task_type) VALUES (?, ?, ?, ?,?)', 
+      [sha256(req.task.name+";"+req.task.question), req.task.name, req.task.description, req.task.question, req.task.type], 
       (err, results) => {
       if (err) {
         console.error('Error executing query:', err);
@@ -264,11 +266,28 @@ async function postSolution(req){
 async function main(){
   
   await postSolution({
-    task:new Task("cim", "test", "test", {mo:"megoldas", valasz: "test"}),
+    task:new Task("cim", "test", "test", {mo:"megoldas", valasz: "test"}, "type"),
     user:{azonosito: "testid2", name: "test2"}
   });
   console.log(await getSolution(new Task("cim", "test", "test", "test2")));
   return null;
 }
 main();
+
+const app = express();
+app.use(express.json());
+app.get('/solution', async (req, res) => {
+  try {
+    const task = new Task(req.query.name, req.query.description, req.query.question, req.query.solution, req.query.type);
+    const solution = await getSolution(task);
+    res.json(solution);
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app
+
+
 //console.log(getSolution(new Task("test", "test", "test", "test")));
