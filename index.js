@@ -176,7 +176,7 @@ async function insertAnswer(taskId, answer){
   return new Promise((resolve, reject) => {
     pool.execute('INSERT INTO answers (task_id, answer, votes) VALUES (?, ?, ?)', [taskId, answer, 0], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing query(179):', err);
         reject(err);
       } else {
         resolve(null);
@@ -222,6 +222,20 @@ async function incrementUserVotes(userId){
     });
   });
 }
+async function insertTask(task){
+  return new Promise((resolve, reject) => {
+    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question, task_type) VALUES (?, ?, ?, ?,?)', 
+      [sha256(task.name+";"+task.question+";"+task.type), task.name, task.description, task.question, task.type], 
+      (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        reject(err);
+      } else {
+        resolve(results.insertId);
+      }
+    });
+  });
+}
 
 async function postSolution(req){
   let taskId = await getTaskId(req.task);
@@ -231,19 +245,9 @@ async function postSolution(req){
     user = await getUser(req.user.azonosito);
   }
   // Check if the task dosen't exist in the database
-  if (taskId == null) {
-    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question, task_type) VALUES (?, ?, ?, ?,?)', 
-      [sha256(req.task.name+";"+req.task.question), req.task.name, req.task.description, req.task.question, req.task.type], 
-      (err, results) => {
-      if (err) {
-        console.error('Error executing query:', err);
-        return null;
-      } else {
-        taskId = results.insertId;
-      }
-    });
+  if (!taskId) {
+    taskId = await insertTask(req.task);
   }
-  taskId = await getTaskId(req.task);
   // Check if the user has already submitted an answer
   vote = await getVote(taskId, user.id); 
   if(vote){
@@ -269,17 +273,30 @@ async function main(){
     task:new Task("cim", "test", "test", {mo:"megoldas", valasz: "test"}, "type"),
     user:{azonosito: "testid2", name: "test2"}
   });
-  console.log(await getSolution(new Task("cim", "test", "test", "test2")));
+  console.log(await getSolution(new Task("cim", "test", "test", "test2", "type")));
   return null;
 }
 main();
 
 const app = express();
+
+
 app.use(express.json());
+
 app.get('/solution', async (req, res) => {
   try {
-    const task = new Task(req.query.name, req.query.description, req.query.question, req.query.solution, req.query.type);
+    if(!req.query.task){
+      console.log("no task");
+      return res.status(400).send('Task is required');
+    }
+    console.log(req.query);
+    const task = JSON.parse(req.query.task);
+    if (!task || !task.name || !task.question || !task.type) {
+      console.log("no task");
+      return res.status(400).send('Task information is required');
+    }
     const solution = await getSolution(task);
+    console.log("successful query",solution);
     res.json(solution);
   } catch (err) {
     console.error('Error:', err);
@@ -287,7 +304,33 @@ app.get('/solution', async (req, res) => {
   }
 });
 
-app
+
+
+app.post('/solution', async (req, res) => {
+  try {
+    if(!req.body){
+      return res.status(400).send('Request body is required');
+    }
+    const task = req.body.task;
+    const user = req.body.user;
+    if (!task || !user || !user.azonosito || !task.name || !task.question || !task.type || !task.solution) {
+      
+      return res.status(400).send('Task and user information are required');
+    }
+    await postSolution(req.body);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.use(express.static('webpage'));
+
+app.listen(3000, () => {
+  console.log('Server is running on port 3000');
+});
+
 
 
 //console.log(getSolution(new Task("test", "test", "test", "test")));
