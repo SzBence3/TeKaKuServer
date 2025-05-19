@@ -1,5 +1,6 @@
 
-const url = 'http://localhost:3000/solution';
+const url = 'http://strong-finals.gl.at.ply.gg:36859/solution';
+
 async function get() {
     let user ={azonosito: "", name: ""};
     let task = {name: "", question: "", type: "", description:""};

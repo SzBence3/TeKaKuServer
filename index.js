@@ -74,7 +74,7 @@ async function getTaskId(task){
   return new Promise((resolve, reject) => {
     pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question+";"+task.type)], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing gettaskid query:', err);
         reject(err);
       } else {
         if (results.length > 0) {
@@ -91,7 +91,7 @@ async function getUser(userid){
   return new Promise((resolve, reject) => {
     pool.execute('SELECT id FROM users WHERE azonosito = ?', [userid], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing getUser query:', err);
         reject(err);
       } else {
         if (results.length > 0) {
@@ -108,7 +108,7 @@ function createNewUser(userid, name){
   return new Promise((resolve, reject) => {
     pool.execute('INSERT INTO users (azonosito, name) VALUES (?, ?)', [userid, name], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing createNewUser query:', err);
         reject(err);
       } else {
         resolve(results.insertId);
@@ -121,7 +121,7 @@ async function getVote(taskId, userId){
   return new Promise((resolve, reject) => {
     pool.execute('SELECT * FROM votes WHERE task_id = ? AND user_id = ?', [taskId, userId], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing getVote query:', err);
         reject(err);
       } else {
         if (results.length > 0) {
@@ -139,12 +139,12 @@ async function deleteVote(vote){
     pool.execute('UPDATE answers SET votes = votes - 1 WHERE id = ?', 
       [vote.answer_id], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing deleteVote1 query:', err);
         return reject(err);
       } else {
         pool.execute("DELETE FROM votes WHERE id = ?",[vote.id], (err, results) => {
           if (err) {
-            console.error('Error executing query:', err);
+            console.error('Error executing deleteVote2 query:', err);
             return reject(err);
           } else {
             resolve(results);
@@ -159,7 +159,7 @@ async function getAnswer(taskId, answer){
   return new Promise((resolve, reject) => {
     pool.execute('SELECT * FROM answers WHERE task_id = ? AND answer = ?', [taskId, answer], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing getAnswer query:', err);
         reject(err);
       } else {
         if (results.length > 0) {
@@ -188,7 +188,7 @@ async function incrementAnswerVotes(answerId){
   return new Promise((resolve, reject) => {
     pool.execute('UPDATE answers SET votes = votes + 1 WHERE id = ?', [answerId], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing incrementAnswerVotes query:', err);
         reject(err);
       } else {
         resolve(null);
@@ -201,7 +201,7 @@ async function insertVote(answerId, userId, taskId){
   return new Promise((resolve, reject) => {
     pool.execute('INSERT INTO votes (answer_id, user_id, task_id) VALUES (?, ?, ?)', [answerId, userId, taskId], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing insertVote query:', err);
         reject(err);
       } else {
         resolve(null);
@@ -214,7 +214,7 @@ async function incrementUserVotes(userId){
   return new Promise((resolve, reject) => {
     pool.execute('UPDATE users SET votes = votes + 1 WHERE id = ?', [userId], (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing INcrementUserVotes query:', err);
         reject(err);
       } else {
         resolve(null);
@@ -228,7 +228,7 @@ async function insertTask(task){
       [sha256(task.name+";"+task.question+";"+task.type), task.name, task.description, task.question, task.type], 
       (err, results) => {
       if (err) {
-        console.error('Error executing query:', err);
+        console.error('Error executing insertTask query:', err);
         reject(err);
       } else {
         resolve(results.insertId);
@@ -276,7 +276,7 @@ async function main(){
   console.log(await getSolution(new Task("cim", "test", "test", "test2", "type")));
   return null;
 }
-main();
+//main();
 
 const app = express();
 
@@ -289,14 +289,14 @@ app.get('/solution', async (req, res) => {
       console.log("no task");
       return res.status(400).send('Task is required');
     }
-    console.log(req.query);
+    //console.log(req.query);
     const task = JSON.parse(req.query.task);
     if (!task || !task.name || !task.question || !task.type) {
-      console.log("no task");
+      console.log("no task info");
       return res.status(400).send('Task information is required');
     }
     const solution = await getSolution(task);
-    console.log("successful query",solution);
+    console.log("successful get",solution);
     res.json(solution);
   } catch (err) {
     console.error('Error:', err);
@@ -309,16 +309,25 @@ app.get('/solution', async (req, res) => {
 app.post('/solution', async (req, res) => {
   try {
     if(!req.body){
+      console.log("no body");
       return res.status(400).send('Request body is required');
     }
     const task = req.body.task;
     const user = req.body.user;
     if (!task || !user || !user.azonosito || !task.name || !task.question || !task.type || !task.solution) {
-      
+      console.log("no task or user info");
+      console.log(req.body);
       return res.status(400).send('Task and user information are required');
+    }
+    if(!req.body.task.description){
+      req.body.task.description = null;
+    }
+    if(!req.body.user.name){
+      req.body.user.name = null;
     }
     await postSolution(req.body);
     res.sendStatus(200);
+    console.log("successful post");
   } catch (err) {
     console.error('Error:', err);
     res.status(500).send('Internal Server Error');
