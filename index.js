@@ -291,15 +291,16 @@ app.get('/solution', async (req, res) => {
     }
     //console.log(req.query);
     const task = JSON.parse(req.query.task);
+    const user = JSON.parse(req.query.user);
     if (!task || !task.name || !task.question || !task.type) {
       console.log("no task info");
       return res.status(400).send('Task information is required');
     }
     const solution = await getSolution(task);
-    console.log("successful get",solution);
+    console.log("successful get"," task: ",task," user: ",user,solution);
     res.json(solution);
   } catch (err) {
-    console.error('Error:', err);
+    console.error('Error while getting solution:',req.query, err);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -327,14 +328,19 @@ app.post('/solution', async (req, res) => {
     }
     await postSolution(req.body);
     res.sendStatus(200);
-    console.log("successful post");
+    console.log("successful post: ",req.body);
   } catch (err) {
-    console.error('Error:', err);
+    console.error('Error in posting: ',req.body);
     res.status(500).send('Internal Server Error');
   }
 });
 
 app.use(express.static('webpage'));
+
+app.use((req, res) => {
+  console.log("404: ",req.url);
+  res.status(404).send('Endpoint not found');
+});
 
 app.listen(3000, () => {
   console.log('Server is running on port 3000');
