@@ -19,14 +19,19 @@ class Task {
   }
 }
 
-
+function getHash(task){
+  return sha256(task.name+";"+task.question+";"+task.type);
+}
 
 // this function handles the incoming get requests
+const getCache = new Map();
 
 async function getSolution(task){
-  
+  if(getCache.has(getHash(task))){
+    return getCache.get(getHash(task));
+  }
   return new Promise((resolve, reject) => {
-    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question+";"+task.type)], (err, results) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [getHash(task)], (err, results) => {
       //console.log("inside getSolution");
       if (err) {
         console.error('Error executing query(index.js:29):', err);
@@ -42,6 +47,13 @@ async function getSolution(task){
                 let totalVotes = 0;
                 for (let i = 0; i < results.length; i++) {
                   totalVotes += results[i].votes;
+                }
+                if(results[0].votes >= 9 && totalVotes <= 10){
+                  getCache.set(getHash(task), {
+                    answer: results[0].answer,
+                    votes: results[0].votes,
+                    totalVotes: totalVotes,
+                  });
                 }
                 resolve({
                   answer: results[0].answer,
@@ -72,7 +84,7 @@ class PostRequest {
 
 async function getTaskId(task){
   return new Promise((resolve, reject) => {
-    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [sha256(task.name+";"+task.question+";"+task.type)], (err, results) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [getHash(task)], (err, results) => {
       if (err) {
         console.error('Error executing gettaskid query:', err);
         reject(err);
@@ -142,14 +154,7 @@ async function deleteVote(vote){
         console.error('Error executing deleteVote1 query:', err);
         return reject(err);
       } else {
-        pool.execute("DELETE FROM votes WHERE id = ?",[vote.id], (err, results) => {
-          if (err) {
-            console.error('Error executing deleteVote2 query:', err);
-            return reject(err);
-          } else {
-            resolve(results);
-          }
-        });
+        resolve(null);
       }
     });
   });
@@ -225,13 +230,26 @@ async function incrementUserVotes(userId){
 async function insertTask(task){
   return new Promise((resolve, reject) => {
     pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question, task_type) VALUES (?, ?, ?, ?,?)', 
-      [sha256(task.name+";"+task.question+";"+task.type), task.name, task.description, task.question, task.type], 
+      [getHash(task), task.name, task.description, task.question, task.type], 
       (err, results) => {
       if (err) {
         console.error('Error executing insertTask query:', err);
         reject(err);
       } else {
         resolve(results.insertId);
+      }
+    });
+  });
+}
+
+async function updateVote(vote, answerId){
+  return new Promise((resolve, reject) => {
+    pool.execute('UPDATE votes SET answer_id = ? WHERE id = ?', [answerId, vote.id], (err, results) => {
+      if (err) {
+        console.error('Error executing updateVote query:', err);
+        reject(err);
+      } else {
+        resolve(null);
       }
     });
   });
@@ -248,12 +266,6 @@ async function postSolution(req){
   if (!taskId) {
     taskId = await insertTask(req.task);
   }
-  // Check if the user has already submitted an answer
-  vote = await getVote(taskId, user.id); 
-  if(vote){
-    await deleteVote(vote);
-  }
-  else await incrementUserVotes(user.id);
   // Check if the answer already exists
   let answer = await getAnswer(taskId, req.task.solution);
   if(!answer){
@@ -261,8 +273,17 @@ async function postSolution(req){
     answer = await getAnswer(taskId, req.task.solution);
   }
   
+  // Check if the user has already submitted an answer
+  vote = await getVote(taskId, user.id); 
+  if(vote){
+    await deleteVote(vote);
+    await updateVote(vote, answer.id);
+  }
+  else {
+    await incrementUserVotes(user.id);
+    await insertVote(answer.id, user.id, taskId);
+  }
   await incrementAnswerVotes(answer.id);
-  await insertVote(answer.id, user.id, taskId);
 
   return null;
 }
@@ -276,6 +297,14 @@ async function main(){
   console.log(await getSolution(new Task("cim", "test", "test", "test2", "type")));
   return null;
 }
+
+function clearCachePeriodicly(){
+  setInterval(() => {
+    getCache.clear();
+    console.log("Cache cleared");
+  }, 1000*60*5);
+}
+clearCachePeriodicly();
 //main();
 
 const app = express();
