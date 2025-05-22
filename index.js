@@ -334,7 +334,26 @@ app.get('/solution', async (req, res) => {
   }
 });
 
-
+app.get('/topapi/', async (req, res) => {
+  try {
+    /*const page = parseInt(req.params.page);
+    const perPage = parseInt(req.params.perpage);
+    if (isNaN(page) || isNaN(perPage)) {
+      return res.status(400).send('Invalid page or perPage parameter');
+    }
+    console.log("page: ",page," perPage: ",perPage);*/
+    pool.execute('SELECT name, votes FROM users ORDER BY votes DESC', [], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        return res.status(500).send('Internal Server Error');
+      }
+      res.json(results);
+    });
+  } catch (err) {
+    console.error('Error while getting topapi:', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 app.post('/solution', async (req, res) => {
   try {
