@@ -1,4 +1,4 @@
-url = 'http://localhost:3000/topapi/';
+const url = 'http://strong-finals.gl.at.ply.gg:36859/topapi';
 async function loadList(){
     console.log("Loading list...");
     const response = await fetch(url);
