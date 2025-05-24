@@ -1,4 +1,3 @@
-# filepath: /home/szbence/dev/TeKaKuServer/stop.sh
 #!/bin/bash
 
 echo "Stopping playit..."
