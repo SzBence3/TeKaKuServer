@@ -254,6 +254,19 @@ async function updateVote(vote, answerId){
     });
   });
 }
+async function changeName(userId, name){
+  return new Promise((resolve, reject) => {
+    pool.execute('UPDATE users SET name = ? WHERE id = ?', [name, userId], (err, results) => {
+      if (err) {
+        console.error('Error executing changeName query:', err);
+        reject(err);
+      } else {
+        resolve(null);
+      }
+    }
+    );
+  });
+}
 
 async function postSolution(req){
   let taskId = await getTaskId(req.task);
@@ -261,6 +274,8 @@ async function postSolution(req){
   if (user == null) {
     await createNewUser(req.user.azonosito, req.user.name)
     user = await getUser(req.user.azonosito);
+  }else if(user.name != req.user.name){
+    await changeName(user.id, req.user.name);
   }
   // Check if the task dosen't exist in the database
   if (!taskId) {
