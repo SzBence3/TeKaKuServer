@@ -3,3 +3,5 @@ password.json
 mysql.json
 .vscode/
 settings.json
+server.log
+playit.log
