@@ -370,6 +370,64 @@ app.get('/topapi/', async (req, res) => {
   }
 });
 
+
+app.get('/announcements/:lastTime', async (req, res) => {
+  try {
+    console.log("getting announcements after: ",req.params.lastTime);
+    const lastTime = new Date(req.params.lastTime);
+    if (isNaN(lastTime.getTime())) {
+      console.log("Invalid date format");
+      return res.status(400).send('Invalid date format');
+    }
+    pool.execute('SELECT * FROM announcements WHERE created_at > ? ORDER BY created_at ASC', [lastTime], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        return res.status(500).send('Internal Server Error');
+      }
+      if (results.length > 0) {
+        console.log("announcements found: ",results);
+        res.json(results);
+      } else {
+        res.json(null);
+      }
+    });
+  } catch (err) {
+    console.error('Error while getting announcements:', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.post('/announcement', async (req, res) => {
+  try {
+    if(!req.body){
+      console.log("no body");
+      return res.status(400).send('Request body is required');
+    }
+    const announcement = req.body;
+    
+    if(!announcement || !announcement.password || announcement.password !== require("./password.json").password) {
+      console.log("invalid password");
+      return res.status(403).send('Forbidden: Invalid password');
+    }
+    if (!announcement || !announcement.title || !announcement.content) {
+      console.log("no announcement info");
+      console.log(req.body);
+      return res.status(400).send('Announcement information is required');
+    }
+    pool.execute('INSERT INTO announcements (title, content) VALUES (?, ?)', [announcement.title, announcement.content], (err, results) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        return res.status(500).send('Internal Server Error');
+      }
+      res.sendStatus(200);
+      console.log("successful post: ",req.body);
+    });
+  } catch (err) {
+    console.error('Error in posting announcement:', req.body, err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 app.post('/solution', async (req, res) => {
   try {
     if(!req.body){
