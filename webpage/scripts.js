@@ -1,5 +1,5 @@
 
-const url = 'http://strong-finals.gl.at.ply.gg:36859/solution';
+const url = window.location.origin + "/solution";
 
 async function get() {
     let user ={azonosito: "", name: ""};
