@@ -21,7 +21,7 @@ SHOW TABLES;
 
 CREATE TABLE IF NOT EXISTS tasks(
     id INT PRIMARY KEY AUTO_INCREMENT,
-    task_name VARCHAR(50) NOT NULL,
+    task_name VARCHAR(127) NOT NULL,
     task_description TEXT,
     task_question TEXT,
     task_type VARCHAR(50) NOT NULL,
