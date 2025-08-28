@@ -7,22 +7,22 @@ const { Server } = require('ws');
 
 const pool = mysql.createPool(require('./mysql.json'));
 
+const CACHE_CLEAR_INTERVAL = 1000*60*5; // in milliseconds
+
 pool.on('error', (err) => {
   console.error('MySQL error:', err);
 });
 
 class Task {
-  constructor(name, description, question, solution, type) {
+  constructor(name, question, solution) {
     this.name = name;
     this.question = question;
-    this.description = description;
     this.solution = solution;
-    this.type = type;
   }
-}
+  }
 
 function getHash(task){
-  return sha256(task.name+";"+task.question+";"+task.type);
+  return sha256(task.name+";"+task.question+";");
 }
 
 // this function handles the incoming get requests
@@ -36,13 +36,13 @@ async function getSolution(task){
     pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [getHash(task)], (err, results) => {
       //console.log("inside getSolution");
       if (err) {
-        console.error('Error executing query(index.js:29):', err);
+        console.error('Error executing getSolution SELECT id query:', err);
         reject(err);
       } else {
         if (results.length > 0) {
           pool.execute('SELECT answer,votes FROM answers WHERE task_id = ? ORDER BY votes DESC', [results[0].id], (err, results) => {
             if (err) {
-              console.error('Error executing query(index.js:35):', err);
+              console.error('Error executing getSolution SELECT answer,votes query:', err);
               reject(err);
             } else {
               if (results.length > 0) {
@@ -231,8 +231,8 @@ async function incrementUserVotes(userId){
 }
 async function insertTask(task){
   return new Promise((resolve, reject) => {
-    pool.execute('INSERT INTO tasks (task_hash, task_name, task_description, task_question, task_type) VALUES (?, ?, ?, ?,?)', 
-      [getHash(task), task.name, task.description, task.question, task.type], 
+    pool.execute('INSERT INTO tasks (task_hash, task_name, task_question) VALUES (?, ?, ?)', 
+      [getHash(task), task.name, task.question], 
       (err, results) => {
       if (err) {
         console.error('Error executing insertTask query:', err);
@@ -279,7 +279,7 @@ async function postSolution(req){
   }else if(user.name != req.user.name){
     await changeName(user.id, req.user.name);
   }
-  // Check if the task dosen't exist in the database
+  // Check if the task doesn't exist in the database
   if (!taskId) {
     taskId = await insertTask(req.task);
   }
@@ -308,20 +308,20 @@ async function postSolution(req){
 async function main(){
   
   await postSolution({
-    task:new Task("cim", "test", "test", {mo:"megoldas", valasz: "test"}, "type"),
+    task:new Task("cim", "test", {mo:"megoldas", valasz: "test"}),
     user:{azonosito: "testid2", name: "test2"}
   });
-  console.log(await getSolution(new Task("cim", "test", "test", "test2", "type")));
+  console.log(await getSolution(new Task("cim", "test", "test")));
   return null;
 }
 
-function clearCachePeriodicly(){
+function clearCachePeriodically(){
   setInterval(() => {
     getCache.clear();
     console.log("Cache cleared");
-  }, 1000*60*5);
+  }, CACHE_CLEAR_INTERVAL);
 }
-clearCachePeriodicly();
+clearCachePeriodically();
 //main();
 
 const app = express();
@@ -340,7 +340,7 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(message);
       console.log('Parsed data:', data);
       if (data.type === 'getSolution') {
-        if (!data.task || !data.task.name || !data.task.question || !data.task.type) {
+        if (!data.task || !data.task.name || !data.task.question) {
           ws.send(JSON.stringify({ error: 'Task is required', id: data.id }));
           return;
         }
@@ -349,9 +349,9 @@ wss.on('connection', (ws) => {
         }
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id , status: 'ok' }));
-      } 
+      }
       else if (data.type === 'postSolution') {
-        if (!data.task || !data.user || !data.user.azonosito || !data.task.name || !data.task.question || !data.task.type || !data.task.solution) {
+        if (!data.task || !data.user || !data.user.azonosito || !data.task.name || !data.task.question || !data.task.solution) {
           ws.send(JSON.stringify({ error: 'Task and user information are required', id: data.id }));
           return;
         }
@@ -396,7 +396,7 @@ app.get('/solution', async (req, res) => {
     //console.log(req.query);
     const task = JSON.parse(req.query.task);
     const user = JSON.parse(req.query.user);
-    if (!task || !task.name || !task.question || !task.type) {
+    if (!task || !task.name || !task.question) {
       console.log("no task info");
       return res.status(400).send('Task information is required');
     }
@@ -496,7 +496,7 @@ app.post('/solution', async (req, res) => {
     }
     const task = req.body.task;
     const user = req.body.user;
-    if (!task || !user || !user.azonosito || !task.name || !task.question || !task.type || !task.solution) {
+    if (!task || !user || !user.azonosito || !task.name || !task.question || !task.solution) {
       console.log("no task or user info");
       console.log(req.body);
       return res.status(400).send('Task and user information are required');

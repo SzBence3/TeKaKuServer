@@ -14,12 +14,8 @@ else
     echo "No updates found."
 fi
 
-# Start the playit application
-echo "Starting the playit application..."
-nohup playit &> playit.log &
-
 # Start the server
 echo "Starting the server..."
 nohup node . &> server.log &
 
-echo "Both server and playit application have been started."
+echo "server has been started."
