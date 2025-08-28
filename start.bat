@@ -12,12 +12,8 @@ if errorlevel 1 (
     echo No updates found.
 )
 
-REM Start the playit application
-echo Starting the playit application...
-start "" /b playit > playit.log 2>&1
-
 REM Start the server
 echo Starting the server...
 start "" /b node . > server.log 2>&1
 
-echo Both server and playit application have been started.
+echo Server has been started.

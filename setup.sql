@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS tasks(
     task_name VARCHAR(127) NOT NULL,
     task_description TEXT,
     task_question TEXT,
-    task_type VARCHAR(50) NOT NULL,
     task_hash VARCHAR(64) NOT NULL UNIQUE
 );
 
