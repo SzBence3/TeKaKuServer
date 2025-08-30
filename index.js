@@ -74,13 +74,7 @@ async function getSolution(task){
 }
 
 //this function handles the incoming post requests
-class PostRequest {
-  constructor(task, userid, name) {
-    this.task = task;
-    this.userid = userid;
-    this.name = name;
-  }
-}
+
 
 async function getTaskId(task){
   return new Promise((resolve, reject) => {
@@ -302,6 +296,7 @@ async function postSolution(req){
 
   return null;
 }
+// for testing. no longer used
 
 async function main(){
   
