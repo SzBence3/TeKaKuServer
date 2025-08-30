@@ -21,10 +21,9 @@ SHOW TABLES;
 
 CREATE TABLE IF NOT EXISTS tasks(
     id INT PRIMARY KEY AUTO_INCREMENT,
-    task_name VARCHAR(50) NOT NULL,
+    task_name VARCHAR(127) NOT NULL,
     task_description TEXT,
     task_question TEXT,
-    task_type VARCHAR(50) NOT NULL,
     task_hash VARCHAR(64) NOT NULL UNIQUE
 );
 
@@ -52,6 +51,14 @@ CREATE TABLE IF NOT EXISTS votes(
 );
 CREATE INDEX idx_user_id ON votes (user_id);
 CREATE INDEX idx_task_id ON votes (task_id);
+
+
+CREATE TABLE IF NOT EXISTS announcements(
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 -- @block
 SHOW TABLES;
 -- @block
@@ -59,3 +66,8 @@ SELECT * FROM users;
 SELECT * FROM tasks;
 SELECT * FROM answers;
 SELECT * FROM votes;
+
+-- @block
+INSERT INTO announcements (title, content) VALUES ('Welcome2', 'The application setup is complete.');
+-- @block
+SELECT * FROM announcements;
