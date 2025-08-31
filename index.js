@@ -327,17 +327,21 @@ app.use(express.json());
 const server = http.createServer(app);
 const wss = new Server({ server });
 
-wss.on('connection', (ws) => {
-  console.log('New WebSocket connection established');
+// Log all headers during WebSocket connection
+wss.on('connection', (ws, req) => {
+  const now = new Date().toISOString();
+  ws.clientIp = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  console.log(`[${now}] New WebSocket connection established with ${ws.clientIp}`);
   ws.on('message', async (message) => {
-    const clientIp = ws._socket.remoteAddress;
+      let clientIp = ws.clientIp;
+        const now = new Date().toISOString();
     try {
       const data = JSON.parse(message);
-      console.log(`[WebSocket][${clientIp}] Received:`, data);
+          console.log(`[${now}][WebSocket][${clientIp}] Received:`, data);
       if (data.type === 'getSolution') {
         if (!data.task || !data.task.name || !data.task.question) {
           ws.send(JSON.stringify({ error: 'Task is required', id: data.id }));
-          console.log(`[WebSocket][${clientIp}] Failed getSolution: missing task info.`);
+            console.log(`[${now}][WebSocket][${clientIp}] Failed getSolution: missing task info.`);
           return;
         }
         if(!data.task.description){
@@ -345,41 +349,41 @@ wss.on('connection', (ws) => {
         }
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id , status: 'ok' }));
-        console.log(`[WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
+    console.log(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
       }
       else if (data.type === 'postSolution') {
         if (!data.task || !data.user || !data.user.azonosito || !data.task.name || !data.task.question || !data.task.solution) {
           ws.send(JSON.stringify({ error: 'Task and user information are required', id: data.id }));
-          console.log(`[WebSocket][${clientIp}] Failed postSolution: missing task/user info.`);
+            console.log(`[${now}][WebSocket][${clientIp}] Failed postSolution: missing task/user info.`);
           return;
         }
         await postSolution({ task: data.task, user: data.user });
         ws.send(JSON.stringify({ type: 'postSolution', status: 'ok', id: data.id }));
-        console.log(`[WebSocket][${clientIp}] Successful postSolution for task:`, data.task, 'user:', data.user);
+    console.log(`[${now}][WebSocket][${clientIp}] Successful postSolution for task:`, data.task, 'user:', data.user);
       } 
       else if (data.type === 'getAnnouncements') {
         const lastTime = new Date(data.lastTime);
         if (isNaN(lastTime.getTime())) {
           ws.send(JSON.stringify({ error: 'Invalid date format', id: data.id }));
-          console.log(`[WebSocket][${clientIp}] Failed getAnnouncements: invalid date format.`);
+            console.log(`[${now}][WebSocket][${clientIp}] Failed getAnnouncements: invalid date format.`);
           return;
         }
         pool.execute('SELECT * FROM announcements WHERE created_at > ? ORDER BY created_at ASC', [lastTime], (err, results) => {
           if (err) {
             ws.send(JSON.stringify({ error: 'Internal Server Error', id: data.id }));
-            console.error(`[WebSocket][${clientIp}] Error executing getAnnouncements query:`, err);
+              console.error(`[${now}][WebSocket][${clientIp}] Error executing getAnnouncements query:`, err);
           } else {
-            ws.send(JSON.stringify({ type: 'announcements', announcements: results.length > 0 ? results : null, id: data.id, status: 'ok' }));  
-            console.log(`[WebSocket][${clientIp}] Successful getAnnouncements.`);
+            ws.send(JSON.stringify({ type: 'announcements', announcements: results.length > 0 ? results : null, id: data.id, status: 'ok' }));
+              console.log(`[${now}][WebSocket][${clientIp}] Successful getAnnouncements.`);
           }
         });
       } else {
         ws.send(JSON.stringify({id: data.id, error: 'Unknown message type' }));
-        console.log(`[WebSocket][${clientIp}] Unknown message type: ${data.type}`);
+    console.log(`[${now}][WebSocket][${clientIp}] Unknown message type: ${data.type}`);
       }
     } catch (err) {
       ws.send(JSON.stringify({ error: 'Invalid message format' }));
-      console.log(`[WebSocket][${clientIp}] Invalid message format.`);
+  console.log(`[${now}][WebSocket][${clientIp}] Invalid message format.`);
     }
   });
   ws.on('close', () => {
@@ -391,23 +395,26 @@ wss.on('connection', (ws) => {
 
 app.get('/solution', async (req, res) => {
   try {
-    const clientIp = req.ip;
+  // Use Cloudflare header if present
+  const clientIp = req.headers['cf-connecting-ip'] || req.ip;
+    const now = new Date().toISOString();
     if(!req.query.task){
-      console.log(`[HTTP][${clientIp}] Failed get /solution: no task.`);
+        console.log(`[${now}][HTTP][${clientIp}] Failed get /solution: no task.`);
       return res.status(400).send('Task is required');
     }
     const task = JSON.parse(req.query.task);
     const user = JSON.parse(req.query.user);
     if (!task || !task.name || !task.question) {
-      console.log(`[HTTP][${clientIp}] Failed get /solution: no task info.`);
+  console.log(`[${now}][HTTP][${clientIp}] Failed get /solution: no task info.`);
       return res.status(400).send('Task information is required');
     }
     const solution = await getSolution(task);
-    console.log(`[HTTP][${clientIp}] Successful get /solution for task:`, task, 'user:', user, solution);
+  console.log(`[${now}][HTTP][${clientIp}] Successful get /solution for task:`, task, 'user:', user, solution);
     res.json(solution);
   } catch (err) {
-    const clientIp = req.ip;
-    console.error(`[HTTP][${clientIp}] Error while getting solution:`, req.query, err);
+  const clientIp = req.headers['cf-connecting-ip'] || req.ip;
+  const now = new Date().toISOString();
+  console.error(`[${now}][HTTP][${clientIp}] Error while getting solution:`, req.query, err);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -493,15 +500,16 @@ app.get('/topapi/', async (req, res) => {
 
 app.post('/solution', async (req, res) => {
   try {
-    const clientIp = req.ip;
+  const clientIp = req.headers['cf-connecting-ip'] || req.ip;
+    const now = new Date().toISOString();
     if(!req.body){
-      console.log(`[HTTP][${clientIp}] Failed post /solution: no body.`);
+        console.log(`[${now}][HTTP][${clientIp}] Failed post /solution: no body.`);
       return res.status(400).send('Request body is required');
     }
     const task = req.body.task;
     const user = req.body.user;
     if (!task || !user || !user.azonosito || !task.name || !task.question || !task.solution) {
-      console.log(`[HTTP][${clientIp}] Failed post /solution: no task or user info.`, req.body);
+  console.log(`[${now}][HTTP][${clientIp}] Failed post /solution: no task or user info.`, req.body);
       return res.status(400).send('Task and user information are required');
     }
     if(!req.body.task.description){
@@ -512,10 +520,11 @@ app.post('/solution', async (req, res) => {
     }
     await postSolution(req.body);
     res.sendStatus(200);
-    console.log(`[HTTP][${clientIp}] Successful post /solution:`, req.body);
+  console.log(`[${now}][HTTP][${clientIp}] Successful post /solution:`, req.body);
   } catch (err) {
-    const clientIp = req.ip;
-    console.error(`[HTTP][${clientIp}] Error in posting:`, req.body);
+  const clientIp = req.headers['cf-connecting-ip'] || req.ip;
+  const now = new Date().toISOString();
+  console.error(`[${now}][HTTP][${clientIp}] Error in posting:`, req.body);
     res.status(500).send('Internal Server Error');
   }
 });
