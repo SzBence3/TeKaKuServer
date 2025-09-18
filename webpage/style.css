@@ -1,3 +1,22 @@
+body{
+    font-family: Arial;
+}
 p {
     font-size: 15pt;
+    font-family: 'Times New Roman', Times, serif;
+}
+h1 {
+    font-size: 30pt;
+    text-align: center;
+}
+h2 {
+    font-size: 20pt;
+}
+h3 {
+    font-size: 17pt;
+    text-align: center;
+}
+.navbar {
+    text-align: center;
+    font-size: 14pt;
 }
