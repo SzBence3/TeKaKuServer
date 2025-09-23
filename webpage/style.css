@@ -1,28 +1,163 @@
-body{
-    font-family: Arial;
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
-p {
-    font-size: 15pt;
-    font-family: 'Times New Roman', Times, serif;
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding-top: 80px; /* Space for fixed navbar */
 }
-h1 {
-    font-size: 30pt;
-    text-align: center;
-}
-h2 {
-    font-size: 20pt;
-}
-h3 {
-    font-size: 17pt;
-    text-align: center;
-}
+
+/* Fixed navbar */
 .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 15px 0;
     text-align: center;
-    font-size: 14pt;
+    font-size: 16px;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
-.padded {
-    width: 85%;
+
+.navbar a {
+    color: #333;
+    text-decoration: none;
+    margin: 0 20px;
+    font-weight: 500;
+    transition: color 0.3s ease;
+    position: relative;
+}
+
+.navbar a:hover {
+    color: #667eea;
+}
+
+.navbar a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -5px;
+    left: 50%;
+    background-color: #667eea;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.navbar a:hover::after {
+    width: 100%;
+}
+
+/* Content container */
+.content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 40px;
+    backdrop-filter: blur(10px);
+}
+
+/* Typography */
+h1 {
+    font-size: 2.5rem;
+    text-align: center;
+    color: #333;
+    margin-bottom: 10px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+h2 {
+    font-size: 2rem;
+    color: #444;
+    margin: 30px 0 15px 0;
+    font-weight: 600;
+}
+
+h3 {
+    font-size: 1.3rem;
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+    font-weight: 400;
+}
+
+p {
+    font-size: 1.1rem;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin-bottom: 20px;
     text-align: justify;
-    margin-left: auto;
-    margin-right: auto;
+    color: #555;
+    line-height: 1.7;
+}
+
+/* Links */
+a {
+    color: #667eea;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+a:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
+/* Utility classes */
+.padded {
+    width: 90%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    body {
+        padding-top: 70px;
+    }
+    
+    .navbar {
+        padding: 10px 0;
+        font-size: 14px;
+    }
+    
+    .navbar a {
+        margin: 0 10px;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    .content {
+        margin: 10px;
+        padding: 15px;
+    }
+    
+    .padded {
+        width: 95%;
+        padding: 15px;
+    }
 }
