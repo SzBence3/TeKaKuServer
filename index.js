@@ -14,26 +14,20 @@ pool.on('error', (err) => {
 });
 
 class Task {
-  constructor(name, question, solution) {
-    this.name = name;
-    this.question = question;
+  constructor(ID, solution) {
+    this.ID = ID;
     this.solution = solution;
   }
 }
-
-function getHash(task) {
-  return sha256(task.name + ";" + task.question + ";");
-}
-
 // this function handles the incoming get requests
 const getCache = new Map();
 
 async function getSolution(task) {
-  if (getCache.has(getHash(task))) {
-    return getCache.get(getHash(task));
+  if (getCache.has(task.ID)) {
+    return getCache.get(task.ID);
   }
   return new Promise((resolve, reject) => {
-    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [getHash(task)], (err, results) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [task.ID], (err, results) => {
       //console.log("inside getSolution");
       if (err) {
         console.error('Error executing getSolution SELECT id query:', err);
@@ -51,7 +45,7 @@ async function getSolution(task) {
                   totalVotes += results[i].votes;
                 }
                 if (results[0].votes >= 9 && totalVotes <= 10) {
-                  getCache.set(getHash(task), {
+                  getCache.set(task.ID, {
                     answer: results[0].answer,
                     votes: results[0].votes,
                     totalVotes: totalVotes,
@@ -80,7 +74,7 @@ async function getSolution(task) {
 
 async function getTaskId(task) {
   return new Promise((resolve, reject) => {
-    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [getHash(task)], (err, results) => {
+    pool.execute('SELECT id FROM tasks WHERE task_hash = ?', [task.ID], (err, results) => {
       if (err) {
         console.error('Error executing gettaskid query:', err);
         reject(err);
@@ -225,8 +219,8 @@ async function incrementUserVotes(userId) {
 }
 async function insertTask(task) {
   return new Promise((resolve, reject) => {
-    pool.execute('INSERT INTO tasks (task_hash, task_name, task_question) VALUES (?, ?, ?)',
-      [getHash(task), task.name, task.question],
+    pool.execute('INSERT INTO tasks (task_hash) VALUES (?)',
+      [task.ID],
       (err, results) => {
         if (err) {
           console.error('Error executing insertTask query:', err);
@@ -298,17 +292,6 @@ async function postSolution(req) {
 
   return null;
 }
-// for testing. no longer used
-
-async function main() {
-
-  await postSolution({
-    task: new Task("cim", "test", { mo: "megoldas", valasz: "test" }),
-    user: { azonosito: "testid2", name: "test2" }
-  });
-  console.log(await getSolution(new Task("cim", "test", "test")));
-  return null;
-}
 
 function clearCachePeriodically() {
   setInterval(() => {
@@ -318,7 +301,6 @@ function clearCachePeriodically() {
   }, CACHE_CLEAR_INTERVAL);
 }
 clearCachePeriodically();
-//main();
 
 const app = express();
 
@@ -340,20 +322,17 @@ wss.on('connection', (ws, req) => {
       const data = JSON.parse(message);
       console.log(`[${now}][WebSocket][${clientIp}] Received:`, data);
       if (data.type === 'getSolution') {
-        if (!data.task || !data.task.name || !data.task.question) {
+        if (!data.task || !data.task.ID) {
           ws.send(JSON.stringify({ error: 'Task is required', id: data.id }));
           console.log(`[${now}][WebSocket][${clientIp}] Failed getSolution: missing task info.`);
           return;
-        }
-        if (!data.task.description) {
-          data.task.description = null;
         }
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id, status: 'ok' }));
         console.log(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
       }
       else if (data.type === 'postSolution') {
-        if (!data.task || !data.user || !data.user.azonosito || !data.task.name || !data.task.question || !data.task.solution) {
+        if (!data.task || !data.user || !data.user.azonosito || !data.task.ID || !data.task.solution) {
           ws.send(JSON.stringify({ error: 'Task and user information are required', id: data.id }));
           console.log(`[${now}][WebSocket][${clientIp}] Failed postSolution: missing task/user info.`);
           return;
@@ -406,7 +385,7 @@ app.get('/solution', async (req, res) => {
     }
     const task = JSON.parse(req.query.task);
     const user = JSON.parse(req.query.user);
-    if (!task || !task.name || !task.question) {
+    if (!task || !task.ID) {
       console.log(`[${now}][HTTP][${clientIp}] Failed get /solution: no task info.`);
       return res.status(400).send('Task information is required');
     }
@@ -510,12 +489,9 @@ app.post('/solution', async (req, res) => {
     }
     const task = req.body.task;
     const user = req.body.user;
-    if (!task || !user || !user.azonosito || !task.name || !task.question || !task.solution) {
+    if (!task || !user || !user.azonosito || !task.ID || !task.solution) {
       console.log(`[${now}][HTTP][${clientIp}] Failed post /solution: no task or user info.`, req.body);
       return res.status(400).send('Task and user information are required');
-    }
-    if (!req.body.task.description) {
-      req.body.task.description = null;
     }
     if (!req.body.user.name) {
       req.body.user.name = null;
