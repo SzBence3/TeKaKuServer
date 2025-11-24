@@ -5,3 +5,4 @@ mysql.json
 settings.json
 server.log
 playit.log
+server.pid

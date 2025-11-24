@@ -323,7 +323,7 @@ wss.on('connection', (ws, req) => {
       console.log(`[${now}][WebSocket][${clientIp}] Received:`, data);
       if (data.type === 'getSolution') {
         if (!data.task || !data.task.ID) {
-          ws.send(JSON.stringify({ error: 'Task is required', id: data.id }));
+          ws.send(JSON.stringify({ error: 'Task is required', id: data.id, info: 'data.task: ' + data.task? data.task : 'missing!' }));
           console.log(`[${now}][WebSocket][${clientIp}] Failed getSolution: missing task info.`);
           return;
         }
