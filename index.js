@@ -20,16 +20,7 @@ class Task {
 }
 
 // Helper: Parse solution input into an array of strings
-function parseSolutions(solutionInput) {
-  let solutions;
-  try {
-    solutions = JSON.parse(solutionInput);
-  } catch (e) {
-    solutions = [solutionInput];
-  }
-  if (!Array.isArray(solutions)) solutions = [solutions];
-  return solutions.map(s => String(s));
-}
+
 
 // Helper: Ensure tasks exist for all subtasks (Batch)
 async function ensureTasks(baseHash, count) {
@@ -209,9 +200,9 @@ async function getSolution(task) {
   }
 
   // Parse input solution to determine structure (array vs single)
-  const solutions = parseSolutions(task.solution);
+  const fieldCount = task.fieldCount || 1;
   const baseHash = task.ID;
-  const taskHashes = solutions.map((_, i) => `${baseHash}_${i}`);
+  const taskHashes = Array.from({ length: fieldCount }, (_, i) => `${baseHash}_${i}`);
 
   // Fetch all related task IDs
   const taskRows = await new Promise((resolve, reject) => {
@@ -238,7 +229,7 @@ async function getSolution(task) {
     });
   });
 
-  const results = solutions.map((_, i) => {
+  const results = Array.from({ length: fieldCount }, (_, i) => {
     const tid = mapHashToId.get(`${baseHash}_${i}`);
     if (!tid) return null;
 
@@ -251,7 +242,7 @@ async function getSolution(task) {
     const totalVotes = subAnswers.reduce((sum, a) => sum + a.votes, 0);
 
     return {
-      answer: best.answer,
+      answer: JSON.parse(best.answer),
       votes: best.votes,
       totalVotes: totalVotes
     };
@@ -466,7 +457,16 @@ async function postSolution(req) {
   }
 
   // Parse solutions
-  const solutions = parseSolutions(req.task.solution);
+  //if there is some bool change them to 1 or 0
+  /*
+  const solutions = req.task.solution.map(sol => {
+    if (typeof sol === 'boolean') {
+      return sol ? '1' : '0';
+    }
+    return sol;
+  });
+  */
+  const solutions = req.task.solution.map(sol => JSON.stringify(sol));
   const baseHash = req.task.ID;
 
   // 1. Ensure subtasks exist
