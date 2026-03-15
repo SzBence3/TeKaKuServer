@@ -7,6 +7,7 @@ const { Server } = require('ws');
 const pool = mysql.createPool(require('./mysql.json'));
 
 const CACHE_CLEAR_INTERVAL = 1000 * 60 * 5; // in milliseconds
+const NO_SOLUTION_CHANCE = 0.1; // 10% chance to pretend no solution exists for a user-task pair
 
 pool.on('error', (err) => {
   console.error('MySQL error:', err);
@@ -17,6 +18,19 @@ class Task {
     this.ID = ID;
     this.solution = solution;
   }
+}
+
+function seededRandomFromUserAndTask(userId, taskId) {
+  const seedHex = sha256(`${userId}:${taskId}`);
+  const seedInt = parseInt(seedHex.slice(0, 8), 16);
+  return seedInt / 0xffffffff;
+}
+
+function shouldPretendNoSolution(userId, taskId) {
+  if (!userId || !taskId || NO_SOLUTION_CHANCE <= 0) {
+    return false;
+  }
+  return seededRandomFromUserAndTask(String(userId), String(taskId)) < NO_SOLUTION_CHANCE;
 }
 
 // Helper: Parse solution input into an array of strings
@@ -195,6 +209,7 @@ async function processBatchVotes(user, mapHashToId, mapHashToAnswerId, solutions
 const getCache = new Map();
 
 async function getSolution(task) {
+  
   if (getCache.has(task.ID)) {
     return getCache.get(task.ID);
   }
@@ -515,6 +530,14 @@ wss.on('connection', (ws, req) => {
           console.log(`[${now}][WebSocket][${clientIp}] Failed getSolution: missing task info.`);
           return;
         }
+
+        const userId = data.user && data.user.azonosito ? data.user.azonosito : null;
+        if (shouldPretendNoSolution(userId, data.task.ID)) {
+          ws.send(JSON.stringify({ type: 'solution', solution: null, id: data.id, status: 'ok' }));
+          console.log(`[${now}][WebSocket][${clientIp}] Intentionally returned no solution for task ${data.task.ID} and user ${userId}.`);
+          return;
+        }
+
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id, status: 'ok' }));
         console.log(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
@@ -572,11 +595,18 @@ app.get('/solution', async (req, res) => {
       return res.status(400).send('Task is required');
     }
     const task = JSON.parse(req.query.task);
-    const user = JSON.parse(req.query.user);
+    const user = req.query.user ? JSON.parse(req.query.user) : null;
     if (!task || !task.ID) {
       console.log(`[${now}][HTTP][${clientIp}] Failed get /solution: no task info.`);
       return res.status(400).send('Task information is required');
     }
+
+    const userId = user && user.azonosito ? user.azonosito : null;
+    if (shouldPretendNoSolution(userId, task.ID)) {
+      console.log(`[${now}][HTTP][${clientIp}] Intentionally returned no solution for task ${task.ID} and user ${userId}.`);
+      return res.json(null);
+    }
+
     const solution = await getSolution(task);
     console.log(`[${now}][HTTP][${clientIp}] Successful get /solution for task:`, task, 'user:', user, solution);
     res.json(solution);
