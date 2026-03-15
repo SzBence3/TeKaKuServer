@@ -8,6 +8,8 @@ const pool = mysql.createPool(require('./mysql.json'));
 
 const CACHE_CLEAR_INTERVAL = 1000 * 60 * 5; // in milliseconds
 const NO_SOLUTION_CHANCE = 0.1; // 10% chance to pretend no solution exists for a user-task pair
+const MIN_VOTES_FOR_CONFIDENCE = 5; // Minimum votes required to consider a solution "confident"
+const CONFIDENCE_THRESHOLD = 0.6; // If the top solution has less than this fraction of votes, consider it "not confident"
 
 pool.on('error', (err) => {
   console.error('MySQL error:', err);
@@ -723,6 +725,13 @@ app.post('/solution', async (req, res) => {
     console.error(`[${now}][HTTP][${clientIp}] Error in posting:`, req.body);
     res.status(500).send('Internal Server Error');
   }
+});
+
+app.get("/minsettings", (req, res) => {
+  res.json({
+    minvotes: MIN_VOTES_FOR_CONFIDENCE,
+    votepercentage: CONFIDENCE_THRESHOLD
+  });
 });
 
 app.use(express.static('webpage'));
