@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<body>
+    Title: <input type = 'text' id = 'title'/><br>
+    Content: <input type = 'text' id = 'content' /><br>
+    Password <input type = 'password' id = 'password'/><br>
+    <input type = 'button' value = 'send announcement' onclick = 'sendAnnouncement()' /><br>
+    <script>
+        async function sendAnnouncement(){
+            fetch(window.location.origin + "/announcement", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: await JSON.stringify({
+                    password: document.getElementById('password').value,
+                    title: document.getElementById('title').value,
+                    content: document.getElementById('content').value
+                })
+            })
+        }
+    </script>
+</body>
+</html>
