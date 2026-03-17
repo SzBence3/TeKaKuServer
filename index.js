@@ -510,19 +510,45 @@ clearCachePeriodically();
 const app = express();
 
 
-const allowedOriginRegexes = [
-  /^https:\/\/([a-z0-9-]+\.)*tehetsegkapu\.hu$/,
-  /^chrome-extension:\/\/[a-z]{32}$/
-];
+function isAllowedOrigin(origin) {
+  if (!origin || typeof origin !== 'string') {
+    return false;
+  }
+
+  if (/^chrome-extension:\/\/[a-z0-9]{32}$/i.test(origin)) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    return parsed.hostname === 'tehetsegkapu.hu' || parsed.hostname.endsWith('.tehetsegkapu.hu');
+  } catch {
+    return false;
+  }
+}
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  const isOriginAllowed = isAllowedOrigin(origin);
+  const now = new Date().toLocaleString();
+  console.log(`[${now}][CORS] ${req.method} ${req.originalUrl} origin=${origin || 'none'} allowed=${isOriginAllowed}`);
 
-  if (origin && allowedOriginRegexes.some(regex => regex.test(origin))) {
+  if (origin && !isOriginAllowed) {
+    console.log(`[${now}][CORS] Blocked disallowed origin ${origin} for ${req.method} ${req.originalUrl}`);
+    return res.status(403).send('Forbidden origin');
+  }
+
+  if (origin && isOriginAllowed) {
+    const requestedHeaders = req.headers['access-control-request-headers'];
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Headers', requestedHeaders || 'Content-Type, Authorization');
+    res.header('Access-Control-Max-Age', '86400');
   }
 
   if (req.method === 'OPTIONS') {
