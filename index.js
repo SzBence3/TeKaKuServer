@@ -264,7 +264,6 @@ async function getSolution(task) {
       totalVotes: totalVotes
     };
   });
-
   // Basic Caching Strategy (only cache if fully resolved and high confidence?)
   // For now, simple cache.
   if (results.every(r => r !== null)) {
@@ -525,7 +524,7 @@ function isAllowedOrigin(origin) {
       return false;
     }
 
-    return parsed.hostname === 'tehetsegkapu.hu' || parsed.hostname.endsWith('.tehetsegkapu.hu');
+    return parsed.hostname === 'tehetsegkapu.hu' || parsed.hostname.endsWith('.tehetsegkapu.hu') || parsed.hostname === 'tekaku.hu';
   } catch {
     return false;
   }
