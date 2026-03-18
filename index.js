@@ -4,12 +4,14 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
 
+require('dotenv').config();
+
 const pool = mysql.createPool(require('./mysql.json'));
 
-const CACHE_CLEAR_INTERVAL = 1000 * 60 * 5; // in milliseconds
-const NO_SOLUTION_CHANCE = 0.1; // 10% chance to pretend no solution exists for a user-task pair
-const MIN_VOTES_FOR_CONFIDENCE = 5; // Minimum votes required to consider a solution "confident"
-const CONFIDENCE_THRESHOLD = 0.6; // If the top solution has less than this fraction of votes, consider it "not confident"
+const CACHE_CLEAR_INTERVAL = parseInt(process.env.CACHE_CLEAR_INTERVAL) || 1000 * 60 * 5; // in milliseconds
+const NO_SOLUTION_CHANCE = parseFloat(process.env.NO_SOLUTION_CHANCE) || 0.1; // 10% chance to pretend no solution exists for a user-task pair
+const MIN_VOTES_FOR_CONFIDENCE = parseInt(process.env.MIN_VOTES_FOR_CONFIDENCE) || 5; // Minimum votes required to consider a solution "confident"
+const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD) || 0.6; // If the top solution has less than this fraction of votes, consider it "not confident"
 
 pool.on('error', (err) => {
   console.error('MySQL error:', err);

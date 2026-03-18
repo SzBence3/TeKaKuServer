@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.3.1",
     "express": "^5.1.0",
     "http": "^0.0.1-security",
     "js-sha256": "^0.11.0",
