@@ -12,6 +12,9 @@ const CACHE_CLEAR_INTERVAL = parseInt(process.env.CACHE_CLEAR_INTERVAL) || 1000 
 const NO_SOLUTION_CHANCE = parseFloat(process.env.NO_SOLUTION_CHANCE) || 0.1; // 10% chance to pretend no solution exists for a user-task pair
 const MIN_VOTES_FOR_CONFIDENCE = parseInt(process.env.MIN_VOTES_FOR_CONFIDENCE) || 5; // Minimum votes required to consider a solution "confident"
 const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD) || 0.6; // If the top solution has less than this fraction of votes, consider it "not confident"
+const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
+
+const debugLog = DEBUG_MODE ? console.log : () => {};
 
 pool.on('error', (err) => {
   console.error('MySQL error:', err);
@@ -503,7 +506,7 @@ function clearCachePeriodically() {
   setInterval(() => {
     getCache.clear();
     const now = new Date().toLocaleString();
-    console.log(`[${now}] Cache cleared`);
+    debugLog(`[${now}] Cache cleared`);
   }, CACHE_CLEAR_INTERVAL);
 }
 clearCachePeriodically();
@@ -536,10 +539,10 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   const isOriginAllowed = isAllowedOrigin(origin);
   const now = new Date().toLocaleString();
-  console.log(`[${now}][CORS] ${req.method} ${req.originalUrl} origin=${origin || 'none'} allowed=${isOriginAllowed}`);
+  debugLog(`[${now}][CORS] ${req.method} ${req.originalUrl} origin=${origin || 'none'} allowed=${isOriginAllowed}`);
 
   if (origin && !isOriginAllowed) {
-    console.log(`[${now}][CORS] Blocked disallowed origin ${origin} for ${req.method} ${req.originalUrl}`);
+    debugLog(`[${now}][CORS] Blocked disallowed origin ${origin} for ${req.method} ${req.originalUrl}`);
     return res.status(403).send('Forbidden origin');
   }
 
@@ -569,46 +572,46 @@ const wss = new Server({ server });
 wss.on('connection', (ws, req) => {
   const now = new Date().toLocaleString();
   ws.clientIp = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  console.log(`[${now}] New WebSocket connection established with ${ws.clientIp}`);
+  debugLog(`[${now}] New WebSocket connection established with ${ws.clientIp}`);
   ws.on('message', async (message) => {
     let clientIp = ws.clientIp;
     const now = new Date().toLocaleString();
     try {
       const data = JSON.parse(message);
-      console.log(`[${now}][WebSocket][${clientIp}] Received:`, data);
+      debugLog(`[${now}][WebSocket][${clientIp}] Received:`, data);
       if (data.type === 'getSolution') {
         if (!data.task || !data.task.ID) {
           ws.send(JSON.stringify({ error: 'Task is required', id: data.id, info: 'data.task: ' + data.task? data.task : 'missing!' }));
-          console.log(`[${now}][WebSocket][${clientIp}] Failed getSolution: missing task info.`);
+          debugLog(`[${now}][WebSocket][${clientIp}] Failed getSolution: missing task info.`);
           return;
         }
 
         const userId = data.user && data.user.azonosito ? data.user.azonosito : null;
         if (shouldPretendNoSolution(userId, data.task.ID)) {
           ws.send(JSON.stringify({ type: 'solution', solution: null, id: data.id, status: 'ok' }));
-          console.log(`[${now}][WebSocket][${clientIp}] Intentionally returned no solution for task ${data.task.ID} and user ${userId}.`);
+          debugLog(`[${now}][WebSocket][${clientIp}] Intentionally returned no solution for task ${data.task.ID} and user ${userId}.`);
           return;
         }
 
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id, status: 'ok' }));
-        console.log(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
+        debugLog(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
       }
       else if (data.type === 'postSolution') {
         if (!data.task || !data.user || !data.user.azonosito || !data.task.ID || !data.task.solution) {
           ws.send(JSON.stringify({ error: 'Task and user information are required', id: data.id }));
-          console.log(`[${now}][WebSocket][${clientIp}] Failed postSolution: missing task/user info.`);
+          debugLog(`[${now}][WebSocket][${clientIp}] Failed postSolution: missing task/user info.`);
           return;
         }
         await postSolution({ task: data.task, user: data.user });
         ws.send(JSON.stringify({ type: 'postSolution', status: 'ok', id: data.id }));
-        console.log(`[${now}][WebSocket][${clientIp}] Successful postSolution for task:`, data.task, 'user:', data.user);
+        debugLog(`[${now}][WebSocket][${clientIp}] Successful postSolution for task:`, data.task, 'user:', data.user);
       }
       else if (data.type === 'getAnnouncements') {
         const lastTime = new Date(data.lastTime);
         if (isNaN(lastTime.getTime())) {
           ws.send(JSON.stringify({ error: 'Invalid date format', id: data.id }));
-          console.log(`[${now}][WebSocket][${clientIp}] Failed getAnnouncements: invalid date format.`);
+          debugLog(`[${now}][WebSocket][${clientIp}] Failed getAnnouncements: invalid date format.`);
           return;
         }
         pool.execute('SELECT * FROM announcements WHERE created_at > ? ORDER BY created_at ASC', [lastTime], (err, results) => {
@@ -617,21 +620,21 @@ wss.on('connection', (ws, req) => {
             console.error(`[${now}][WebSocket][${clientIp}] Error executing getAnnouncements query:`, err);
           } else {
             ws.send(JSON.stringify({ type: 'announcements', announcements: results.length > 0 ? results : null, id: data.id, status: 'ok' }));
-            console.log(`[${now}][WebSocket][${clientIp}] Successful getAnnouncements.`);
+            debugLog(`[${now}][WebSocket][${clientIp}] Successful getAnnouncements.`);
           }
         });
       } else {
         ws.send(JSON.stringify({ id: data.id, error: 'Unknown message type' }));
-        console.log(`[${now}][WebSocket][${clientIp}] Unknown message type: ${data.type}`);
+        debugLog(`[${now}][WebSocket][${clientIp}] Unknown message type: ${data.type}`);
       }
     } catch (err) {
       ws.send(JSON.stringify({ error: 'Invalid message format' }));
-      console.log(`[${now}][WebSocket][${clientIp}] Invalid message format.`);
+      debugLog(`[${now}][WebSocket][${clientIp}] Invalid message format.`);
     }
   });
   ws.on('close', () => {
     const now = new Date().toLocaleString();
-    console.log(`[${now}] [${ws.clientIp}] WebSocket connection closed`);
+    debugLog(`[${now}] [${ws.clientIp}] WebSocket connection closed`);
   });
 });
 
@@ -643,24 +646,24 @@ app.get('/solution', async (req, res) => {
     const clientIp = req.headers['cf-connecting-ip'] || req.ip;
     const now = new Date().toLocaleString();
     if (!req.query.task) {
-      console.log(`[${now}][HTTP][${clientIp}] Failed get /solution: no task.`);
+      debugLog(`[${now}][HTTP][${clientIp}] Failed get /solution: no task.`);
       return res.status(400).send('Task is required');
     }
     const task = JSON.parse(req.query.task);
     const user = req.query.user ? JSON.parse(req.query.user) : null;
     if (!task || !task.ID) {
-      console.log(`[${now}][HTTP][${clientIp}] Failed get /solution: no task info.`);
+      debugLog(`[${now}][HTTP][${clientIp}] Failed get /solution: no task info.`);
       return res.status(400).send('Task information is required');
     }
 
     const userId = user && user.azonosito ? user.azonosito : null;
     if (shouldPretendNoSolution(userId, task.ID)) {
-      console.log(`[${now}][HTTP][${clientIp}] Intentionally returned no solution for task ${task.ID} and user ${userId}.`);
+      debugLog(`[${now}][HTTP][${clientIp}] Intentionally returned no solution for task ${task.ID} and user ${userId}.`);
       return res.json(null);
     }
 
     const solution = await getSolution(task);
-    console.log(`[${now}][HTTP][${clientIp}] Successful get /solution for task:`, task, 'user:', user, solution);
+    debugLog(`[${now}][HTTP][${clientIp}] Successful get /solution for task:`, task, 'user:', user, solution);
     res.json(solution);
   } catch (err) {
     const clientIp = req.headers['cf-connecting-ip'] || req.ip;
@@ -677,7 +680,7 @@ app.get('/topapi/', async (req, res) => {
     if (isNaN(page) || isNaN(perPage)) {
       return res.status(400).send('Invalid page or perPage parameter');
       }
-      console.log("page: ",page," perPage: ",perPage);*/
+      debugLog("page: ",page," perPage: ",perPage);*/
     pool.execute('SELECT name, votes FROM users ORDER BY votes DESC', [], (err, results) => {
       if (err) {
         console.error('Error executing query:', err);
@@ -694,10 +697,10 @@ app.get('/topapi/', async (req, res) => {
 
 app.get('/announcements/:lastTime', async (req, res) => {
   try {
-    console.log("getting announcements after: ", req.params.lastTime);
+    debugLog("getting announcements after: ", req.params.lastTime);
     const lastTime = new Date(req.params.lastTime);
     if (isNaN(lastTime.getTime())) {
-      console.log("Invalid date format");
+      debugLog("Invalid date format");
       return res.status(400).send('Invalid date format');
     }
     pool.execute('SELECT * FROM announcements WHERE created_at > ? ORDER BY created_at ASC', [lastTime], (err, results) => {
@@ -706,7 +709,7 @@ app.get('/announcements/:lastTime', async (req, res) => {
         return res.status(500).send('Internal Server Error');
       }
       if (results.length > 0) {
-        console.log("announcements found: ", results);
+        debugLog("announcements found: ", results);
         res.json(results);
       } else {
         res.json(null);
@@ -721,18 +724,18 @@ app.get('/announcements/:lastTime', async (req, res) => {
 app.post('/announcement', async (req, res) => {
   try {
     if (!req.body) {
-      console.log("no body");
+      debugLog("no body");
       return res.status(400).send('Request body is required');
     }
     const announcement = req.body;
 
     if (!announcement || !announcement.password || announcement.password !== require("./password.json").password) {
-      console.log("invalid password");
+      debugLog("invalid password");
       return res.status(403).send('Forbidden: Invalid password');
     }
     if (!announcement || !announcement.title || !announcement.content) {
-      console.log("no announcement info");
-      console.log(req.body);
+      debugLog("no announcement info");
+      debugLog(req.body);
       return res.status(400).send('Announcement information is required');
     }
     pool.execute('INSERT INTO announcements (title, content) VALUES (?, ?)', [announcement.title, announcement.content], (err, results) => {
@@ -741,7 +744,7 @@ app.post('/announcement', async (req, res) => {
         return res.status(500).send('Internal Server Error');
       }
       res.sendStatus(200);
-      console.log("successful post: ", req.body);
+      debugLog("successful post: ", req.body);
     });
   } catch (err) {
     console.error('Error in posting announcement:', req.body, err);
@@ -754,13 +757,13 @@ app.post('/solution', async (req, res) => {
     const clientIp = req.headers['cf-connecting-ip'] || req.ip;
     const now = new Date().toLocaleString();
     if (!req.body) {
-      console.log(`[${now}][HTTP][${clientIp}] Failed post /solution: no body.`);
+      debugLog(`[${now}][HTTP][${clientIp}] Failed post /solution: no body.`);
       return res.status(400).send('Request body is required');
     }
     const task = req.body.task;
     const user = req.body.user;
     if (!task || !user || !user.azonosito || !task.ID || !task.solution) {
-      console.log(`[${now}][HTTP][${clientIp}] Failed post /solution: no task or user info.`, req.body);
+      debugLog(`[${now}][HTTP][${clientIp}] Failed post /solution: no task or user info.`, req.body);
       return res.status(400).send('Task and user information are required');
     }
     if (!req.body.user.name) {
@@ -768,7 +771,7 @@ app.post('/solution', async (req, res) => {
     }
     await postSolution(req.body);
     res.sendStatus(200);
-    console.log(`[${now}][HTTP][${clientIp}] Successful post /solution:`, req.body);
+    debugLog(`[${now}][HTTP][${clientIp}] Successful post /solution:`, req.body);
   } catch (err) {
     const clientIp = req.headers['cf-connecting-ip'] || req.ip;
     const now = new Date().toLocaleString();
@@ -788,16 +791,16 @@ app.use(express.static('webpage'));
 
 app.use((req, res) => {
   const now = new Date().toLocaleString();
-  console.log(`[${now}] 404: `, req.url);
+  debugLog(`[${now}] 404: `, req.url);
   res.status(404).send('Endpoint not found');
 });
 
-//app.listen(3000, () => {console.log('Server is running on port 3000');});
+//app.listen(3000, () => {debugLog('Server is running on port 3000');});
 
 
 
 server.listen(3000, () => {
   const now = new Date().toLocaleString();
-  console.log(`[${now}] Server (HTTP+WebSocket) is running on port 3000`);
+  debugLog(`[${now}] Server (HTTP+WebSocket) is running on port 3000`);
 });
-//console.log(getSolution(new Task("test", "test", "test", "test")));
+//debugLog(getSolution(new Task("test", "test", "test", "test")));
