@@ -22,12 +22,7 @@
                     })
                 })
                 const res = req.status;
-                if (res === 200) {
-                    document.getElementById('result').innerText = "Announcement posted successfully!";
-                } else {
-                    const data = req.body;
-                    document.getElementById('result').innerText = "Error: " + data;
-                }
+                document.getElementById('result').innerText = "Response status: " + res;
             }
             catch (e) {
                 document.getElementById('result').innerText = "Error: " + e.message;
