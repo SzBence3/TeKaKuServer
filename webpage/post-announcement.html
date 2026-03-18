@@ -1,24 +1,40 @@
 <!DOCTYPE html>
 <html>
+
 <body>
-    Title: <input type = 'text' id = 'title'/><br>
-    Content: <input type = 'text' id = 'content' /><br>
-    Password <input type = 'password' id = 'password'/><br>
-    <input type = 'button' value = 'send announcement' onclick = 'sendAnnouncement()' /><br>
+    Title: <input type='text' id='title' /><br>
+    Content: <input type='text' id='content' /><br>
+    Password <input type='password' id='password' /><br>
+    <input type='button' value='send announcement' onclick='sendAnnouncement()' /><br>
+    <div id='result'></div>
     <script>
-        async function sendAnnouncement(){
-            fetch(window.location.origin + "/announcement", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: await JSON.stringify({
-                    password: document.getElementById('password').value,
-                    title: document.getElementById('title').value,
-                    content: document.getElementById('content').value
+        async function sendAnnouncement() {
+            try {
+                const req = await fetch(window.location.origin + "/announcement", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: await JSON.stringify({
+                        password: document.getElementById('password').value,
+                        title: document.getElementById('title').value,
+                        content: document.getElementById('content').value
+                    })
                 })
-            })
+                const res = req.status;
+                if (res === 200) {
+                    document.getElementById('result').innerText = "Announcement posted successfully!";
+                } else {
+                    const data = req.body;
+                    document.getElementById('result').innerText = "Error: " + data;
+                }
+            }
+            catch (e) {
+                document.getElementById('result').innerText = "Error: " + e.message;
+                return;
+            }
         }
     </script>
 </body>
+
 </html>
