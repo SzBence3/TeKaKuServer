@@ -3,13 +3,15 @@ const sha256 = require('js-sha256').sha256;
 const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
+const { debug } = require('console');
+const { debuglog } = require('util');
 
 require('dotenv').config();
 
 const pool = mysql.createPool(require('./mysql.json'));
 
 const CACHE_CLEAR_INTERVAL = parseInt(process.env.CACHE_CLEAR_INTERVAL) || 1000 * 60 * 5; // in milliseconds
-const NO_SOLUTION_CHANCE = parseFloat(process.env.NO_SOLUTION_CHANCE) || 0.1; // 10% chance to pretend no solution exists for a user-task pair
+const NO_SOLUTION_CHANCE = parseFloat(process.env.NO_SOLUTION_CHANCE)!==undefined ? parseFloat(process.env.NO_SOLUTION_CHANCE) : 0.1; // 10% chance to pretend no solution exists for a user-task pair
 const MIN_VOTES_FOR_CONFIDENCE = parseInt(process.env.MIN_VOTES_FOR_CONFIDENCE) || 5; // Minimum votes required to consider a solution "confident"
 const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD) || 0.6; // If the top solution has less than this fraction of votes, consider it "not confident"
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
@@ -515,24 +517,7 @@ const app = express();
 
 
 function isAllowedOrigin(origin) {
-  if (!origin || typeof origin !== 'string') {
-    return false;
-  }
-
-  if (/^chrome-extension:\/\/[a-z0-9]{32}$/i.test(origin)) {
-    return true;
-  }
-
-  try {
-    const parsed = new URL(origin);
-    if (parsed.protocol !== 'https:') {
-      return false;
-    }
-
-    return parsed.hostname === 'tehetsegkapu.hu' || parsed.hostname.endsWith('.tehetsegkapu.hu') || parsed.hostname === 'tekaku.hu';
-  } catch {
-    return false;
-  }
+  return true;
 }
 
 app.use((req, res, next) => {
@@ -592,7 +577,7 @@ wss.on('connection', (ws, req) => {
           debugLog(`[${now}][WebSocket][${clientIp}] Intentionally returned no solution for task ${data.task.ID} and user ${userId}.`);
           return;
         }
-
+        
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id, status: 'ok' }));
         debugLog(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
