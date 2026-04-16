@@ -6,3 +6,4 @@ settings.json
 server.log
 playit.log
 server.pid
+DB_backups/

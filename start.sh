@@ -27,7 +27,7 @@ if [[ -f "$PID_FILE" ]]; then
 fi
 
 echo "Starting the server..."
-nohup node . &> server.log &
+nohup node . >> server.log 2>&1 &
 NODE_PID=$!
 echo "$NODE_PID" > "$PID_FILE"
 

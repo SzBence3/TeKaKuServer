@@ -3,8 +3,6 @@ const sha256 = require('js-sha256').sha256;
 const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
-const { debug } = require('console');
-const { debuglog } = require('util');
 
 require('dotenv').config();
 
@@ -322,6 +320,7 @@ function createNewUser(userid, name) {
     pool.execute('INSERT INTO users (azonosito, name) VALUES (?, ?)', [userid, name], (err, results) => {
       if (err) {
         console.error('Error executing createNewUser query:', err);
+        console.log('userid:', userid, '\nname:', name);
         reject(err);
       } else {
         resolve(results.insertId);
@@ -573,14 +572,14 @@ wss.on('connection', (ws, req) => {
 
         const userId = data.user && data.user.azonosito ? data.user.azonosito : null;
         if (shouldPretendNoSolution(userId, data.task.ID)) {
-          ws.send(JSON.stringify({ type: 'solution', solution: null, id: data.id, status: 'ok' }));
+          ws.send(JSON.stringify({ type: 'solution', solution: 0, id: data.id, status: 'ok' }));
           debugLog(`[${now}][WebSocket][${clientIp}] Intentionally returned no solution for task ${data.task.ID} and user ${userId}.`);
           return;
         }
         
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id, status: 'ok' }));
-        debugLog(`[${now}][WebSocket][${clientIp}] Successful getSolution for task:`, data.task);
+        debugLog(`[${now}][WebSocket][${clientIp}] Successful getSolution`);
       }
       else if (data.type === 'postSolution') {
         if (!data.task || !data.user || !data.user.azonosito || !data.task.ID || !data.task.solution) {
@@ -590,7 +589,7 @@ wss.on('connection', (ws, req) => {
         }
         await postSolution({ task: data.task, user: data.user });
         ws.send(JSON.stringify({ type: 'postSolution', status: 'ok', id: data.id }));
-        debugLog(`[${now}][WebSocket][${clientIp}] Successful postSolution for task:`, data.task, 'user:', data.user);
+        debugLog(`[${now}][WebSocket][${clientIp}] Successful postSolution`);
       }
       else if (data.type === 'getAnnouncements') {
         const lastTime = new Date(data.lastTime);

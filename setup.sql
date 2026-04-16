@@ -9,7 +9,7 @@ DROP TABLE IF EXISTS users;
 
 CREATE TABLE IF NOT EXISTS users(
     id INT PRIMARY KEY AUTO_INCREMENT,
-    azonosito VARCHAR(50) NOT NULL,
+    azonosito VARCHAR(200) NOT NULL,
     `name` VARCHAR(50),
     votes INT DEFAULT 0
 );
