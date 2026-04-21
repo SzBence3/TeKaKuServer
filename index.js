@@ -16,6 +16,8 @@ const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
 
 const debugLog = DEBUG_MODE ? console.log : () => {};
 
+console.log(`[${new Date().toLocaleString()}] server started with settings: \nNO_SOLUTION_CHANCE=${NO_SOLUTION_CHANCE}, \nMIN_VOTES_FOR_CONFIDENCE=${MIN_VOTES_FOR_CONFIDENCE}, \nCONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD}, \nDEBUG_MODE=${DEBUG_MODE}`);
+
 pool.on('error', (err) => {
   console.error('MySQL error:', err);
 });
@@ -38,6 +40,49 @@ function shouldPretendNoSolution(userId, taskId) {
     return false;
   }
   return seededRandomFromUserAndTask(String(userId), String(taskId)) < NO_SOLUTION_CHANCE;
+}
+
+/**
+ * Builds the subtask hashes for a task.
+ * Uses task.solution.length when task.solution is an array, otherwise falls back to task.fieldCount or 1.
+ * Returns hashes in the form task.ID_0, task.ID_1, ...
+ * Returns [] if task.ID is missing.
+ */
+function getTaskHashesFromTask(task) {
+  if (!task || !task.ID) return [];
+  const count = Array.isArray(task.solution)
+    ? task.solution.length
+    : (parseInt(task.fieldCount) || 1);
+  return Array.from({ length: count }, (_, i) => `${task.ID}_${i}`);
+}
+
+/**
+ * Updates last_solution_queried_at for all tasks matching the given hashes.
+ */
+async function markTasksQueriedByHashes(taskHashes) {
+  if (!taskHashes || taskHashes.length === 0) return;
+  await new Promise((resolve, reject) => {
+    const placeholders = taskHashes.map(() => '?').join(',');
+    pool.execute(
+      `UPDATE tasks SET last_solution_queried_at = NOW() WHERE task_hash IN (${placeholders})`,
+      taskHashes,
+      (err) => (err ? reject(err) : resolve())
+    );
+  });
+}
+/**
+ * Updates last_solution_posted_at for all tasks matching the given IDs.
+ */
+async function markTasksPostedByIds(taskIds) {
+  if (!taskIds || taskIds.length === 0) return;
+  await new Promise((resolve, reject) => {
+    const placeholders = taskIds.map(() => '?').join(',');
+    pool.execute(
+      `UPDATE tasks SET last_solution_posted_at = NOW() WHERE id IN (${placeholders})`,
+      taskIds,
+      (err) => (err ? reject(err) : resolve())
+    );
+  });
 }
 
 // Helper: Parse solution input into an array of strings
@@ -493,6 +538,7 @@ async function postSolution(req) {
 
   // 1. Ensure subtasks exist
   const { mapHashToId } = await ensureTasks(baseHash, solutions.length);
+  await markTasksPostedByIds(Array.from(mapHashToId.values()));
 
   // 2. Ensure answers exist
   const mapHashToAnswerId = await ensureAnswers(baseHash, mapHashToId, solutions);
@@ -570,6 +616,8 @@ wss.on('connection', (ws, req) => {
           return;
         }
 
+        await markTasksQueriedByHashes(getTaskHashesFromTask(data.task));
+
         const userId = data.user && data.user.azonosito ? data.user.azonosito : null;
         if (shouldPretendNoSolution(userId, data.task.ID)) {
           ws.send(JSON.stringify({ type: 'solution', solution: 0, id: data.id, status: 'ok' }));
@@ -579,7 +627,8 @@ wss.on('connection', (ws, req) => {
         
         const solution = await getSolution(data.task);
         ws.send(JSON.stringify({ type: 'solution', solution, id: data.id, status: 'ok' }));
-        debugLog(`[${now}][WebSocket][${clientIp}] Successful getSolution`);
+        debugLog(`[${now}][WebSocket][${clientIp}] Successful getSolution`, 'votes: ', solution ? solution.map((s) => s.votes) : 'no solution', 'totalVotes: ', solution ? solution.map((s) => s.totalVotes) : 'no solution');
+        debugLog('solution is: ', solution);
       }
       else if (data.type === 'postSolution') {
         if (!data.task || !data.user || !data.user.azonosito || !data.task.ID || !data.task.solution) {
@@ -613,7 +662,7 @@ wss.on('connection', (ws, req) => {
       }
     } catch (err) {
       ws.send(JSON.stringify({ error: 'Invalid message format' }));
-      debugLog(`[${now}][WebSocket][${clientIp}] Invalid message format.`);
+      debugLog(`[${now}][WebSocket][${clientIp}] Invalid message format, error message: ${err.message}, full error: ${err}`);
     }
   });
   ws.on('close', () => {

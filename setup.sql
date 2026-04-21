@@ -21,7 +21,9 @@ SHOW TABLES;
 
 CREATE TABLE IF NOT EXISTS tasks(
     id INT PRIMARY KEY AUTO_INCREMENT,
-    task_hash VARCHAR(70) NOT NULL UNIQUE
+    task_hash VARCHAR(70) NOT NULL UNIQUE,
+    last_solution_posted_at DATETIME NULL,
+    last_solution_queried_at DATETIME NULL
 );
 
 CREATE UNIQUE INDEX idx_task_hash ON tasks (task_hash);
