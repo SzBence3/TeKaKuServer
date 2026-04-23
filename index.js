@@ -85,6 +85,33 @@ async function markTasksPostedByIds(taskIds) {
   });
 }
 
+/**
+ * Updates last_solution_queried_at for a user.
+ */
+async function markUserQueriedByAzonosito(azonosito) {
+  if (!azonosito) return;
+  await new Promise((resolve, reject) => {
+    pool.execute(
+      'UPDATE users SET last_solution_queried_at = NOW() WHERE azonosito = ?',
+      [azonosito],
+      (err) => (err ? reject(err) : resolve())
+    );
+  });
+}
+/**
+ * Updates last_solution_posted_at for a user.
+ */
+async function markUserPostedById(userId) {
+  if (!userId) return;
+  await new Promise((resolve, reject) => {
+    pool.execute(
+      'UPDATE users SET last_solution_posted_at = NOW() WHERE id = ?',
+      [userId],
+      (err) => (err ? reject(err) : resolve())
+    );
+  });
+}
+
 // Helper: Parse solution input into an array of strings
 
 
@@ -522,6 +549,7 @@ async function postSolution(req) {
   } else if (user.name != req.user.name) {
     await changeName(user.id, req.user.name);
   }
+  await markUserPostedById(user.id);
 
   // Parse solutions
   //if there is some bool change them to 1 or 0
@@ -617,6 +645,7 @@ wss.on('connection', (ws, req) => {
         }
 
         await markTasksQueriedByHashes(getTaskHashesFromTask(data.task));
+        await markUserQueriedByAzonosito(data.user && data.user.azonosito ? data.user.azonosito : null);
 
         const userId = data.user && data.user.azonosito ? data.user.azonosito : null;
         if (shouldPretendNoSolution(userId, data.task.ID)) {
@@ -690,6 +719,7 @@ app.get('/solution', async (req, res) => {
     }
 
     const userId = user && user.azonosito ? user.azonosito : null;
+    await markUserQueriedByAzonosito(userId);
     if (shouldPretendNoSolution(userId, task.ID)) {
       debugLog(`[${now}][HTTP][${clientIp}] Intentionally returned no solution for task ${task.ID} and user ${userId}.`);
       return res.json(null);

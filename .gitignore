@@ -7,3 +7,4 @@ server.log
 playit.log
 server.pid
 DB_backups/
+DB_queries/
